@@ -2,11 +2,8 @@ package polyglot.a01b
 
 import polyglot.OptionToOptional
 import util.Optionals.Optional as ScalaOptional
-import polyglot.a01b.Logics
 import util.Sequences.Sequence
 import util.Sequences.Sequence.*
-
-import scala.jdk.javaapi.OptionConverters
 
 // ***** UTILITY EXTENSIONS *****
 extension [E] (s: Sequence[E])
