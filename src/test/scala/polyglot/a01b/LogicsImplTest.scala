@@ -3,6 +3,7 @@ package polyglot.a01b
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import util.Sequences.Sequence
+import java.util.Optional
 class LogicsImplTest:
 
   private val size = 4
@@ -37,4 +38,20 @@ class LogicsImplTest:
     assertEquals(mines, countedMines)
     assertEquals(mines, correctlyPlacedMines)
 
+  @Test def adjacentNumberOfMinesIsCorrectForEveryCell(): Unit =
+    assertEquals(Optional.of(0), logics.hit(0, 0))
+    assertEquals(Optional.of(0), logics.hit(0, 1))
+    assertEquals(Optional.of(0), logics.hit(0, 2))
+    assertEquals(Optional.of(0), logics.hit(0, 3))
+    assertEquals(Optional.of(0), logics.hit(1, 3))
+    assertEquals(Optional.of(0), logics.hit(2, 3))
+    assertEquals(Optional.of(0), logics.hit(3, 3))
 
+    assertEquals(Optional.of(2), logics.hit(1, 0))
+    assertEquals(Optional.of(2), logics.hit(1, 1))
+    assertEquals(Optional.of(2), logics.hit(3, 0))
+    assertEquals(Optional.of(2), logics.hit(3, 1))
+
+    assertEquals(Optional.of(1), logics.hit(1, 2))
+    assertEquals(Optional.of(1), logics.hit(2, 2))
+    assertEquals(Optional.of(1), logics.hit(3, 2))
