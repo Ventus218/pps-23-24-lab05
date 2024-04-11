@@ -1,7 +1,6 @@
 package polyglot.a01b
 
 import polyglot.OptionToOptional
-import util.Optionals.Optional as ScalaOptional
 import util.Sequences.Sequence
 import util.Sequences.Sequence.*
 import scala.util.Random
@@ -24,7 +23,7 @@ extension [E] (s: Sequence[E])
 
 enum Cell:
   case MineCell()
-  case EmptyCell(adjacentMines: Int)
+  case EmptyCell(adjacentMines: Int, wasHit: Boolean)
 
 case class Coordinates(x: Int, y: Int)
 
@@ -43,7 +42,7 @@ class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[C
     do
       val coordinates = Coordinates(x, y)
       if !mineCoordinates.contains(coordinates) then
-        cells = cells.concat(Sequence((coordinates, Cell.EmptyCell(0))))
+        cells = cells.concat(Sequence((coordinates, Cell.EmptyCell(0, false))))
 
     mineCoordinates.foreach(
       mineCoordinates =>
@@ -57,23 +56,33 @@ class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[C
           // took only coordinates adjacent to the mine.
         do
           cells = cells.updateWhere((coordinates, _) => coordinates == Coordinates(x, y), (coordinates, cell) => cell match
-            case Cell.EmptyCell(n) => (coordinates, Cell.EmptyCell(n+1))
+            case Cell.EmptyCell(n, h) => (coordinates, Cell.EmptyCell(n+1, h))
             case Cell.MineCell() => (coordinates, Cell.MineCell()))
     )
 
   def hit(x: Int, y: Int): java.util.Optional[Integer] =
-    var res = cells
+    val res = cells
       .find(_ == Coordinates(x, y) && _ != Cell.MineCell())
       .map((_, cell) => cell match
-        case Cell.EmptyCell(n) => n
+        case Cell.EmptyCell(n, _) => n
         case Cell.MineCell() => throw new IllegalStateException())
+    if !res.isEmpty then
+      cells = cells.updateWhere((coordinates, _) => coordinates == Coordinates(x, y), (coordinates, cell) => cell match
+        case Cell.EmptyCell(n, false) => (coordinates, Cell.EmptyCell(n, true))
+        case _ => (coordinates, cell))
     OptionToOptional(res)
 
-  def won = false
+  def won: Boolean =
+    // If there is no cell which was not hit then the player must have won
+    cells.find(
+      (_, cell) => cell match
+      case Cell.EmptyCell(_, false) => true
+      case _ => false
+    ).isEmpty
 
 object LogicsImpl:
   def apply(size: Int, mines: Int): LogicsImpl =
-    var random = Random();
+    val random = Random()
     var mineCoordinates = Sequence[Coordinates]()
     while mineCoordinates.length() < mines do
       val coordinates = Coordinates(random.nextInt(size), random.nextInt(size))

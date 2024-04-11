@@ -55,3 +55,13 @@ class LogicsImplTest:
     assertEquals(Optional.of(1), logics.hit(1, 2))
     assertEquals(Optional.of(1), logics.hit(2, 2))
     assertEquals(Optional.of(1), logics.hit(3, 2))
+
+  @Test def gameIsWonAfterAllNonMineCellsAreHit(): Unit =
+    for
+      x <- 0 until size
+      y <- 0 until size
+      if (!mineCoordinates.contains(Coordinates(x, y)))
+    do
+      logics.hit(x, y)
+
+    assertTrue(logics.won())
