@@ -2,6 +2,7 @@ package ex
 
 import util.Optionals.Optional
 import util.Sequences.*
+import polyglot.a01b.length
 
 trait Item:
   def code: Int
@@ -68,6 +69,31 @@ object Warehouse:
     override def contains(itemCode: Int): Boolean =
       !retrieve(itemCode).isEmpty
 
+extension [T] (opt: Optional[T])
+  def get(): T = opt match
+    case Optional.Just(n) => n
+    case Optional.Empty() => throw new NoSuchElementException("Unwrapped Optional was empty")
+
+extension [E] (s: Sequence[E])
+  def firstWhere(predicate: E => Boolean): Optional[E] = s match
+    case Sequence.Cons(h, t) => if predicate(h) then Optional.Just(h) else t.firstWhere(predicate)
+    case _ => Optional.Empty()
+
+object OptionalToOption:
+  def apply[A](optional: Optional[A]): Option[A] = optional match
+    case Optional.Just(a) => Option(a)
+    case Optional.Empty() => Option.empty
+
+object sameTag:
+  def unapply(items: Sequence[Item]): Option[String] =
+    if items.head.isEmpty then
+      Option.empty
+    else
+      // if there is a tag common to all items then checking the tags of the first item is just enough
+      val firstItem = items.head.get()
+      OptionalToOption(firstItem.tags.firstWhere(tag => items.filter(_.tags.contains(tag)).length() == items.length()))
+
+
 @main def mainWarehouse(): Unit =
   val warehouse = Warehouse()
 
@@ -97,6 +123,16 @@ object Warehouse:
     warehouse.remove(dellXps) // side effect, remove dell xps from the warehouse
   println:
     warehouse.retrieve(dellXps.code) // None
+
+  val itemsWithCommonTag = Sequence(dellXps, dellInspiron)
+  itemsWithCommonTag match
+    case sameTag(t) => println(s"TEST PASSED: items have same tag $t")
+    case _ => println(s"TEST FAILED: items do not have common tags")
+
+  val itemsWithoutCommonTag = Sequence(dellXps, dellInspiron, xiaomiMoped)
+  itemsWithoutCommonTag match
+    case sameTag(t) => println(s"TEST FAILED: items should not have same tag $t")
+    case _ => println(s"TEST PASSED: items do not have common tags")
 
 /** Hints:
  * - Implement the Item with a simple case class
