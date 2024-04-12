@@ -19,19 +19,23 @@ extension [E] (s: Sequence[E])
     case Cons(h, t) => Cons(if predicate(h) then updatingFunc(h) else h, t.updateWhere(predicate, updatingFunc))
     case _ => Nil()
 
-// ***** UTILITY DATA STRUCTURES *****
-
-enum Cell:
-  case MineCell()
-  case EmptyCell(adjacentMines: Int, wasHit: Boolean)
-
-case class Coordinates(x: Int, y: Int)
-
-// ***** ACTUAL LOGICS IMPLEMENTATION *****
+trait Coordinates:
+  val x: Int
+  val y: Int
+object Coordinates {
+  private case class CoordinatesImpl(x: Int, y: Int) extends Coordinates
+  def apply(x: Int, y: Int): Coordinates = CoordinatesImpl(x, y)
+}
 
 /** solution and descriptions at https://bitbucket.org/mviroli/oop2019-esami/src/master/a01b/sol2/ */
 class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[Coordinates]) extends Logics:
 
+  // ***** UTILITY DATA STRUCTURES *****
+  private enum Cell:
+    case MineCell()
+    case EmptyCell(adjacentMines: Int, wasHit: Boolean)
+
+// ***** ACTUAL LOGICS IMPLEMENTATION *****
   private var cells: Sequence[(Coordinates, Cell)] = Sequence()
 
   initCells()
