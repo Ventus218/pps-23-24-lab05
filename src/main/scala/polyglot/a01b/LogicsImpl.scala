@@ -4,6 +4,8 @@ import polyglot.OptionToOptional
 import util.Sequences.Sequence
 import util.Sequences.Sequence.*
 import scala.util.Random
+import ex.get
+import util.Optionals.Optional
 
 // ***** UTILITY EXTENSIONS *****
 extension [E] (s: Sequence[E])
@@ -19,6 +21,7 @@ extension [E] (s: Sequence[E])
     case Cons(h, t) => Cons(if predicate(h) then updatingFunc(h) else h, t.updateWhere(predicate, updatingFunc))
     case _ => Nil()
 
+// ***** UTILITY DATA STRUCTURES *****
 trait Coordinates:
   val x: Int
   val y: Int
@@ -27,30 +30,51 @@ object Coordinates {
   def apply(x: Int, y: Int): Coordinates = CoordinatesImpl(x, y)
 }
 
-/** solution and descriptions at https://bitbucket.org/mviroli/oop2019-esami/src/master/a01b/sol2/ */
-class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[Coordinates]) extends Logics:
+trait Grid[E]:
+  val size: Int
+  def get(coordinates: Coordinates): E
+  def change(coordinates: Coordinates, changeFunc: E => E): Unit
+  def findFirst(predicate: E => Boolean): Optional[Coordinates]
+object Grid:
+  private class GridImpl[E](val size: Int) extends Grid[E]:
+    private var cells: Sequence[(Coordinates, E)] = Sequence()
+    def initCell(coordinates: Coordinates, e: E): Unit =
+      if cells.find((c, _) => c == coordinates).isEmpty then
+        cells = cells concat Sequence((coordinates, e))
+      else
+        throw new IllegalStateException("Grid cell already initialized")
+    override def get(coordinates: Coordinates): E =
+      cells.find((c, _) => c == coordinates).get()._2
+    override def change(coordinates: Coordinates, changeFunc: E => E): Unit =
+      cells = cells.updateWhere((c, _) => c == coordinates, (_, e) => (coordinates, changeFunc(e)))
+    override def findFirst(predicate: E => Boolean): Optional[Coordinates] =
+      cells.find((_, e) => predicate(e)).map(_._1)
 
-  // ***** UTILITY DATA STRUCTURES *****
-  private enum Cell:
-    case MineCell()
-    case EmptyCell(adjacentMines: Int, wasHit: Boolean)
-
-// ***** ACTUAL LOGICS IMPLEMENTATION *****
-  private var cells: Sequence[(Coordinates, Cell)] = Sequence()
-
-  initCells()
-  private def initCells(): Unit =
+  def apply[E](size: Int, gridFiller: Coordinates => E): Grid[E] =
+    val gridImpl = new GridImpl[E](size)
     for
       x <- 0 until size
       y <- 0 until size
     do
       val coordinates = Coordinates(x, y)
-      if !mineCoordinates.contains(coordinates) then
-        cells = cells.concat(Sequence((coordinates, Cell.EmptyCell(0, false))))
+      gridImpl.initCell(coordinates, gridFiller(coordinates))
+    gridImpl
 
+
+// ***** ACTUAL LOGICS IMPLEMENTATION *****
+/** solution and descriptions at https://bitbucket.org/mviroli/oop2019-esami/src/master/a01b/sol2/ */
+class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[Coordinates]) extends Logics:
+
+  private enum Cell:
+    case MineCell()
+    case EmptyCell(adjacentMines: Int, wasHit: Boolean)
+
+  private val grid = Grid(size, coordinates => if mineCoordinates.contains(coordinates) then Cell.MineCell() else Cell.EmptyCell(0, false))
+
+  computeAdjacentMineNumbers()
+  private def computeAdjacentMineNumbers(): Unit =
     mineCoordinates.foreach(
       mineCoordinates =>
-        cells = cells.concat(Sequence((mineCoordinates, Cell.MineCell())))
         for
           x <- mineCoordinates.x - 1 to mineCoordinates.x + 1
           if (x >= 0 && x < size)
@@ -59,30 +83,30 @@ class LogicsImpl (private val size: Int, private val mineCoordinates: Sequence[C
           if (Coordinates(x, y) != mineCoordinates)
           // took only coordinates adjacent to the mine.
         do
-          cells = cells.updateWhere((coordinates, _) => coordinates == Coordinates(x, y), (coordinates, cell) => cell match
-            case Cell.EmptyCell(n, h) => (coordinates, Cell.EmptyCell(n+1, h))
-            case Cell.MineCell() => (coordinates, Cell.MineCell()))
+          val coordinates = Coordinates(x, y)
+          grid.change(coordinates, _ match
+            case Cell.EmptyCell(n, h) => Cell.EmptyCell(n + 1, h)
+            case Cell.MineCell() => Cell.MineCell())
     )
 
   def hit(x: Int, y: Int): java.util.Optional[Integer] =
-    val res = cells
-      .find(_ == Coordinates(x, y) && _ != Cell.MineCell())
-      .map((_, cell) => cell match
-        case Cell.EmptyCell(n, _) => n
-        case Cell.MineCell() => throw new IllegalStateException())
+    val coordinates = Coordinates(x, y)
+    val res = grid.get(coordinates) match
+      case Cell.MineCell() => Optional.Empty()
+      case Cell.EmptyCell(n, _) => Optional.Just(n)
+
     if !res.isEmpty then
-      cells = cells.updateWhere((coordinates, _) => coordinates == Coordinates(x, y), (coordinates, cell) => cell match
-        case Cell.EmptyCell(n, false) => (coordinates, Cell.EmptyCell(n, true))
-        case _ => (coordinates, cell))
+      grid.change(coordinates, cell => cell match
+        case Cell.EmptyCell(n, false) => Cell.EmptyCell(n, true)
+        case _ => cell)
     OptionToOptional(res)
 
   def won: Boolean =
     // If there is no cell which was not hit then the player must have won
-    cells.find(
-      (_, cell) => cell match
+    grid.findFirst(_ match
       case Cell.EmptyCell(_, false) => true
       case _ => false
-    ).isEmpty
+      ).isEmpty
 
 object LogicsImpl:
   def apply(size: Int, mines: Int): LogicsImpl =
